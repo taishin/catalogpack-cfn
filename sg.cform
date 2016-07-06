@@ -1,0 +1,93 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "LookupLambdaFunction": {
+      "Type": "String",
+      "AllowedPattern": "^arn:aws:lambda:[-:a-zA-Z0-9]*$"
+    },
+    "VPCStackName": {
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleVPC"
+    }
+  },
+  "Resources": {
+    "VPCInfo": {
+      "Type": "Custom::VPCInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "VPCStackName"
+        }
+      }
+    },
+    "BaseSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Base Security Group",
+        "VpcId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "VPCId"
+          ]
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "WebServerGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "WebServer SG",
+        "VpcId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "VPCId"
+          ]
+        }
+      }
+    },
+    "ELBGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "ELB SG",
+        "VpcId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "VPCId"
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "BaseSecurityGroup": {
+      "Description": "Base SecurityGroup ID",
+      "Value": {
+        "Ref": "BaseSecurityGroup"
+      }
+    },
+    "WebServerSecurityGroup": {
+      "Description": "WebServers SecurityGroup ID",
+      "Value": {
+        "Ref": "WebServerGroup"
+      }
+    },
+    "ELBSecurityGroup": {
+      "Description": "ELB SecurityGroup ID",
+      "Value": {
+        "Ref": "ELBGroup"
+      }
+    }
+  }
+}

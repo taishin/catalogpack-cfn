@@ -1,0 +1,138 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "",
+  "Metadata": {},
+  "Parameters": {
+    "LookupLambdaFunction": {
+      "Description": "Input Loookup Lambda Function Name(ARN)",
+      "Type": "String",
+      "AllowedPattern": "^arn:aws:lambda:[-:a-zA-Z0-9]*$"
+    },
+    "VPCStackName": {
+      "Description": "Input VPC Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleVPC"
+    },
+    "SGStackName": {
+      "Description": "Input Security Group Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleSG"
+    }
+  },
+  "Mappings": {},
+  "Conditions": {},
+  "Resources": {
+    "VPCInfo": {
+      "Type": "Custom::VPCInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "VPCStackName"
+        }
+      }
+    },
+    "SGInfo": {
+      "Type": "Custom::SGInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "SGStackName"
+        }
+      }
+    },
+    "FileSystem": {
+      "Type": "AWS::EFS::FileSystem",
+      "Properties": {
+        "FileSystemTags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          }
+        ]
+      }
+    },
+    "MountTarget1": {
+      "Type": "AWS::EFS::MountTarget",
+      "Properties": {
+        "FileSystemId": {
+          "Ref": "FileSystem"
+        },
+        "SubnetId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "Private1Subnet"
+          ]
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "MountTargetSecurityGroup"
+          }
+        ]
+      }
+    },
+    "MountTarget2": {
+      "Type": "AWS::EFS::MountTarget",
+      "Properties": {
+        "FileSystemId": {
+          "Ref": "FileSystem"
+        },
+        "SubnetId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "Private2Subnet"
+          ]
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "MountTargetSecurityGroup"
+          }
+        ]
+      }
+    },
+    "MountTargetSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "VPCId"
+          ]
+        },
+        "GroupDescription": "Security group for mount target",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "2049",
+            "ToPort": "2049",
+            "SourceSecurityGroupId": {
+              "Fn::GetAtt": [
+                "SGInfo",
+                "WebServerSecurityGroup"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "FileSystemID": {
+      "Description": "File system ID",
+      "Value": {
+        "Ref": "FileSystem"
+      }
+    }
+  }
+}

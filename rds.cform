@@ -1,0 +1,194 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "LookupLambdaFunction": {
+      "Description": "Input Loookup Lambda Function Name(ARN)",
+      "Type": "String",
+      "AllowedPattern": "^arn:aws:lambda:[-:a-zA-Z0-9]*$"
+    },
+    "VPCStackName": {
+      "Description": "Input VPC Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleVPC"
+    },
+    "SGStackName": {
+      "Description": "Input Security Group Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleSG"
+    },
+    "DBInstanceType": {
+      "Description": "input DB Instance Class",
+      "Type": "String",
+      "AllowedValues": [
+        "db.t2.micro",
+        "db.t2.small",
+        "db.t2.medium",
+        "db.t2.large",
+        "db.m4.large",
+        "db.m4.xlarge",
+        "db.m4.2xlarge",
+        "db.m4.4xlarge",
+        "db.m4.10xlarge",
+        "db.m3.medium",
+        "db.m3.large",
+        "db.m3.xlarge",
+        "db.m3.2xlarge",
+        "db.r3.large",
+        "db.r3.xlarge",
+        "db.r3.2xlarge",
+        "db.r3.4xlarge",
+        "db.r3.8xlarge"
+      ],
+      "Default": "db.t2.micro"
+    },
+    "DBSize": {
+      "Type": "String",
+      "Default": "20"
+    },
+    "DBName": {
+      "Type": "String",
+      "Default": "sampledb"
+    },
+    "DBUser": {
+      "Type": "String",
+      "Default": "dbuser"
+    },
+    "DBPassword": {
+      "Type": "String",
+      "Default": "password"
+    }
+  },
+  "Resources": {
+    "VPCInfo": {
+      "Type": "Custom::VPCInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "VPCStackName"
+        }
+      }
+    },
+    "SGInfo": {
+      "Type": "Custom::SGInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "SGStackName"
+        }
+      }
+    },
+    "DBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable access from WebServer",
+        "VpcId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "VPCId"
+          ]
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "3306",
+            "ToPort": "3306",
+            "SourceSecurityGroupId": {
+              "Fn::GetAtt": [
+                "SGInfo",
+                "WebServerSecurityGroup"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "DBSubnetGroup": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": "DB Subnet Group",
+        "SubnetIds": [
+          {
+            "Fn::GetAtt": [
+              "VPCInfo",
+              "Private1Subnet"
+            ]
+          },
+          {
+            "Fn::GetAtt": [
+              "VPCInfo",
+              "Private2Subnet"
+            ]
+          }
+        ]
+      }
+    },
+    "DBInstance": {
+      "Type": "AWS::RDS::DBInstance",
+      "DeletionPolicy": "Snapshot",
+      "Properties": {
+        "AllocatedStorage": {
+          "Ref": "DBSize"
+        },
+        "StorageType": "gp2",
+        "AllowMajorVersionUpgrade": "False",
+        "AutoMinorVersionUpgrade": "False",
+        "BackupRetentionPeriod": "2",
+        "DBSubnetGroupName": {
+          "Ref": "DBSubnetGroup"
+        },
+        "MultiAZ": true,
+        "DBInstanceClass": {
+          "Ref": "DBInstanceType"
+        },
+        "DBInstanceIdentifier": {
+          "Ref": "AWS::StackName"
+        },
+        "DBName": {
+          "Ref": "DBName"
+        },
+        "Engine": "MySQL",
+        "MasterUserPassword": {
+          "Ref": "DBPassword"
+        },
+        "MasterUsername": {
+          "Ref": "DBUser"
+        },
+        "VPCSecurityGroups": [
+          {
+            "Ref": "DBSecurityGroup"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "DBEndpointAddress": {
+      "Description": "DB Endpoint Address",
+      "Value": {
+        "Fn::GetAtt": [
+          "DBInstance",
+          "Endpoint.Address"
+        ]
+      }
+    },
+    "DBEndpointPort": {
+      "Description": "DB Endpoint Port",
+      "Value": {
+        "Fn::GetAtt": [
+          "DBInstance",
+          "Endpoint.Port"
+        ]
+      }
+    }
+  }
+}

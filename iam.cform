@@ -1,0 +1,50 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "WebServerIAMInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {
+            "Ref": "WebServerIAMRole"
+          }
+        ]
+      }
+    },
+    "WebServerIAMRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sts:AssumeRole"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              }
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM",
+          "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy",
+          "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+        ],
+        "Path": "/"
+      }
+    }
+  },
+  "Outputs": {
+    "WebServerIAMInstanceProfile": {
+      "Description": "WebServer IAM InstanceProfile",
+      "Value": {
+        "Ref": "WebServerIAMInstanceProfile"
+      }
+    }
+  }
+}

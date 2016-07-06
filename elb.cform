@@ -1,0 +1,138 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "LookupLambdaFunction": {
+      "Type": "String",
+      "AllowedPattern": "^arn:aws:lambda:[-:a-zA-Z0-9]*$"
+    },
+    "VPCStackName": {
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleVPC"
+    },
+    "SGStackName": {
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleSG"
+    }
+  },
+  "Resources": {
+    "VPCInfo": {
+      "Type": "Custom::VPCInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "VPCStackName"
+        }
+      }
+    },
+    "SGInfo": {
+      "Type": "Custom::SGInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "SGStackName"
+        }
+      }
+    },
+    "ELBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable HTTP/HTTPS ingress",
+        "VpcId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "VPCId"
+          ]
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "ELB": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties": {
+        "LoadBalancerName": {
+          "Ref": "AWS::StackName"
+        },
+        "CrossZone": true,
+        "Subnets": [
+          {
+            "Fn::GetAtt": [
+              "VPCInfo",
+              "Public1Subnet"
+            ]
+          },
+          {
+            "Fn::GetAtt": [
+              "VPCInfo",
+              "Public2Subnet"
+            ]
+          }
+        ],
+        "SecurityGroups": [
+          {
+            "Fn::GetAtt": [
+              "SGInfo",
+              "ELBSecurityGroup"
+            ]
+          },
+          {
+            "Ref": "ELBSecurityGroup"
+          }
+        ],
+        "Listeners": [
+          {
+            "LoadBalancerPort": "80",
+            "InstancePort": "80",
+            "Protocol": "HTTP"
+          }
+        ],
+        "HealthCheck": {
+          "Target": "HTTP:80/index.html",
+          "HealthyThreshold": "3",
+          "UnhealthyThreshold": "5",
+          "Interval": "30",
+          "Timeout": "5"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ELBName": {
+      "Description": "ELB Name",
+      "Value": {
+        "Ref": "ELB"
+      }
+    },
+    "DNSName": {
+      "Description": "ELB DNS Name",
+      "Value": {
+        "Fn::GetAtt": [
+          "ELB",
+          "DNSName"
+        ]
+      }
+    }
+  }
+}

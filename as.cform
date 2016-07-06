@@ -1,0 +1,378 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "",
+  "Metadata": {},
+  "Parameters": {
+    "LookupLambdaFunction": {
+      "Description": "Input Loookup Lambda Function Name(ARN)",
+      "Type": "String",
+      "AllowedPattern": "^arn:aws:lambda:[-:a-zA-Z0-9]*$"
+    },
+    "VPCStackName": {
+      "Description": "Input VPC Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleVPC"
+    },
+    "SGStackName": {
+      "Description": "Input Security Group Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleSG"
+    },
+    "IAMStackName": {
+      "Description": "Input IAM Profile Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleIAM"
+    },
+    "ELBStackName": {
+      "Description": "Input IAM Profile Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleIAM"
+    },
+    "EFSStackName": {
+      "Description": "Input EFS Profile Stack Name",
+      "Type": "String",
+      "MinLength": 1,
+      "MaxLength": 255,
+      "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default": "SampleIAM"
+    },
+    "KeyName": {
+      "Description": "input EC2 Keyname",
+      "Type": "AWS::EC2::KeyPair::KeyName"
+    },
+    "ImageId": {
+      "Description": "input AMI Image ID",
+      "Type": "String",
+      "AllowedPattern": "^ami-[a-zA-Z0-9]*$",
+      "Default": "ami-7172b611"
+    },
+    "InstanceType": {
+      "Description": "input Instance Type",
+      "Type": "String",
+      "AllowedValues": [
+        "t2.nano",
+        "t2.micro",
+        "t2.small",
+        "t2.medium",
+        "t2.large",
+        "m4.large",
+        "m4.xlarge",
+        "m4.2xlarge",
+        "m4.4xlarge",
+        "m4.10xlarge",
+        "m3.medium",
+        "m3.large",
+        "m3.xlarge",
+        "m3.2xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "c4.8xlarge",
+        "g2.2xlarge",
+        "g8.2xlarge",
+        "r3.large",
+        "r3.xlarge",
+        "r3.2xlarge",
+        "r3.4xlarge",
+        "r3.8xlarge",
+        "d2.xlarge",
+        "d2.xlarge",
+        "d2.4xlarge",
+        "d2.8xlarge",
+        "i2.xlarge",
+        "i2.2xlarge",
+        "i2.4xlarge",
+        "i2.8xlarge",
+        "hi1.4xlarge",
+        "hs1.8xlarge",
+        "cr1.8xlarge",
+        "cc2.8xlarge",
+        "cg1.4xlarge"
+      ],
+      "Default": "t2.micro"
+    },
+    "MinSize": {
+      "Description": "Minimum Instance Number",
+      "Type": "String",
+      "AllowedPattern": "^[0-9]*$",
+      "Default": "2"
+    },
+    "MaxSize": {
+      "Description": "Maximum Instance Number",
+      "Type": "String",
+      "AllowedPattern": "^[0-9]*$",
+      "Default": "3"
+    }
+  },
+  "Mappings": {},
+  "Conditions": {},
+  "Resources": {
+    "VPCInfo": {
+      "Type": "Custom::VPCInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "VPCStackName"
+        }
+      }
+    },
+    "SGInfo": {
+      "Type": "Custom::SGInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "SGStackName"
+        }
+      }
+    },
+    "IAMInfo": {
+      "Type": "Custom::IAMInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "IAMStackName"
+        }
+      }
+    },
+    "ELBInfo": {
+      "Type": "Custom::IAMInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "ELBStackName"
+        }
+      }
+    },
+    "EFSInfo": {
+      "Type": "Custom::IAMInfo",
+      "Properties": {
+        "ServiceToken": {
+          "Ref": "LookupLambdaFunction"
+        },
+        "StackName": {
+          "Ref": "EFSStackName"
+        }
+      }
+    },
+    "HTTPSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable HTTP ingress",
+        "VpcId": {
+          "Fn::GetAtt": [
+            "VPCInfo",
+            "VPCId"
+          ]
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "WebServerAutoScaleGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "LaunchConfigurationName": {
+          "Ref": "LaunchConfig"
+        },
+        "MinSize": { "Ref": "MinSize" },
+        "MaxSize": { "Ref": "MaxSize" },
+        "LoadBalancerNames": [
+          {
+            "Fn::GetAtt": [
+              "ELBInfo",
+              "ELBName"
+            ]
+          }
+        ],
+        "VPCZoneIdentifier": [
+          {
+            "Fn::GetAtt": [
+              "VPCInfo",
+              "Public1Subnet"
+            ]
+          },
+          {
+            "Fn::GetAtt": [
+              "VPCInfo",
+              "Public2Subnet"
+            ]
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "AWS::StackName"
+            },
+            "PropagateAtLaunch": true
+          }
+        ]
+      }
+    },
+    "LaunchConfig": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "KeyName": {
+          "Ref": "KeyName"
+        },
+        "ImageId": {
+          "Ref": "ImageId"
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "HTTPSecurityGroup"
+          },
+          {
+            "Fn::GetAtt": [
+              "SGInfo",
+              "BaseSecurityGroup"
+            ]
+          },
+          {
+            "Fn::GetAtt": [
+              "SGInfo",
+              "WebServerSecurityGroup"
+            ]
+          }
+        ],
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "AssociatePublicIpAddress": true,
+        "IamInstanceProfile": {
+          "Fn::GetAtt": [
+            "IAMInfo",
+            "WebServerIAMInstanceProfile"
+          ]
+        },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/sh\n",
+                "yum update -y\n",
+                "yum install nfs-utils -y\n",
+                "mkdir /mnt/efs\n",
+                "mount -t nfs4 -o nfsvers=4.1 $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone).",
+                {
+                  "Fn::GetAtt": [
+                    "EFSInfo",
+                    "FileSystemID"
+                  ]
+                },
+                ".efs.",
+                {
+                  "Ref": "AWS::Region"
+                },
+                ".amazonaws.com:/ /mnt/efs\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "WebServerScaleUpPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "WebServerAutoScaleGroup"
+        },
+        "Cooldown": "60",
+        "ScalingAdjustment": "1"
+      }
+    },
+    "WebServerScaleDownPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "WebServerAutoScaleGroup"
+        },
+        "Cooldown": "60",
+        "ScalingAdjustment": "-1"
+      }
+    },
+    "CPUAlarmHigh": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Scale-up if CPU > 90% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "90",
+        "AlarmActions": [
+          {
+            "Ref": "WebServerScaleUpPolicy"
+          }
+        ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": {
+              "Ref": "WebServerAutoScaleGroup"
+            }
+          }
+        ],
+        "ComparisonOperator": "GreaterThanThreshold"
+      }
+    },
+    "CPUAlarmLow": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Scale-down if CPU < 70% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "70",
+        "AlarmActions": [
+          {
+            "Ref": "WebServerScaleDownPolicy"
+          }
+        ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": {
+              "Ref": "WebServerAutoScaleGroup"
+            }
+          }
+        ],
+        "ComparisonOperator": "LessThanThreshold"
+      }
+    }
+  },
+  "Outputs": {}
+}
